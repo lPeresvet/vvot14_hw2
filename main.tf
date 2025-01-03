@@ -65,7 +65,7 @@ resource "yandex_function" "face-detect" {
 
   storage_mounts {
     mount_point_name = "images"
-    bucket = yandex_storage_bucket.input-bucket.id
+    bucket = yandex_storage_bucket.input-bucket.bucket
     prefix           = ""
   }
 
