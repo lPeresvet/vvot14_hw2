@@ -1,4 +1,4 @@
-package face_detection
+package main
 
 import (
 	"context"
