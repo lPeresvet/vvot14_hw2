@@ -69,7 +69,7 @@ resource "yandex_function_trigger" "input_trigger" {
   name        = "vvot14-photo"
   description = "Триггер для запуска обработчика vvot14-face-detection"
   function {
-    id                 = yandex_function.face_detect.id
+    id                 = yandex_function.face-detect.id
     service_account_id = yandex_iam_service_account.func-bot-account.id
     retry_attempts     = 2
   }
