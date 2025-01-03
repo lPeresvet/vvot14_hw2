@@ -72,6 +72,7 @@ resource "yandex_function_trigger" "input_trigger" {
     id                 = yandex_function.face-detect.id
     service_account_id = yandex_iam_service_account.func-bot-account.id
     retry_attempts     = 2
+    retry_interval = 10
   }
   object_storage {
     bucket_id    = yandex_storage_bucket.input-bucket.id
