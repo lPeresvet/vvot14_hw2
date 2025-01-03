@@ -36,7 +36,7 @@ resource "yandex_iam_service_account" "func-bot-account" {
 resource "archive_file" "zip" {
   type = "zip"
   output_path = "src.zip"
-  source_dir = "internal"
+  source_dir = "internal/face_detection"
 }
 
 resource "yandex_storage_bucket" "input-bucket" {
