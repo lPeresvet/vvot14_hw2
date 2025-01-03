@@ -44,7 +44,7 @@ resource "yandex_storage_bucket" "input-bucket" {
   folder_id = var.folder_id
 }
 
-resource "yandex_function" "face_detect" {
+resource "yandex_function" "face-detect" {
   name        = "vvot14-face-detection"
   user_hash   = archive_file.zip.output_sha256
   runtime     = "golang121"
