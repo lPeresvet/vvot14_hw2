@@ -33,6 +33,15 @@ resource "yandex_iam_service_account" "func-bot-account" {
   folder_id   = var.folder_id
 }
 
+resource "yandex_resourcemanager_folder_iam_binding" "mount-iam" {
+  folder_id = var.folder_id
+  role               = "editor"
+
+  members = [
+    "serviceAccount:${yandex_iam_service_account.func-bot-account.id}",
+  ]
+}
+
 resource "archive_file" "zip" {
   type = "zip"
   output_path = "src.zip"
