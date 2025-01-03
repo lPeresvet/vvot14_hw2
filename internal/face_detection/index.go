@@ -40,7 +40,7 @@ type APIGatewayResponse struct {
 }
 
 func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse, error) {
-	log.Println(event)
+	log.Printf("%v", event)
 	return &APIGatewayResponse{
 		StatusCode: 200,
 	}, nil
