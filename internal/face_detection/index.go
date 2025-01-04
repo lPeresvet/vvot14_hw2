@@ -4,11 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Kagami/go-face"
 	"log"
+	"path/filepath"
 	"time"
-
-	pigo "github.com/esimov/pigo/core"
 )
+
+const dataDir = "images"
 
 type Messages struct {
 	Messages []struct {
@@ -37,7 +39,6 @@ type Response struct {
 }
 
 func Handler(ctx context.Context, request []byte) (*Response, error) {
-	_ = pigo.NewPigo()
 
 	messages := &Messages{}
 
@@ -47,8 +48,51 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 	log.Println(messages)
 
+	rec, err := face.NewRecognizer(filepath.Join(dataDir, "models"))
+	if err != nil {
+		log.Printf("Can't init face recognizer: %v", err)
+	}
+	// Free the resources when you're finished.
+	defer rec.Close()
+
+	for _, msg := range messages.Messages {
+		faceBounds, err := detectFaceBounds(filepath.Join(dataDir, msg.Details.ObjectId), rec)
+		if err != nil {
+			log.Printf("Can't detect faces: %v", err)
+		}
+
+		log.Println(faceBounds)
+	}
+
 	return &Response{
 		StatusCode: 200,
 		Body:       fmt.Sprintf("Hello, %s", "rew"),
 	}, nil
+}
+
+type FaceBounds struct {
+	X      int
+	Y      int
+	Width  int
+	Height int
+}
+
+// detectFaceBounds - Функция для распознавания границ лица на изображении
+func detectFaceBounds(imagePath string, recognizer *face.Recognizer) ([]FaceBounds, error) {
+
+	faces, err := recognizer.RecognizeFile(imagePath)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка распознавания лиц: %w", err)
+	}
+
+	var faceBounds []FaceBounds
+	for _, face := range faces {
+		faceBounds = append(faceBounds, FaceBounds{
+			X:      face.Rectangle.Min.X,
+			Y:      face.Rectangle.Min.Y,
+			Width:  face.Rectangle.Max.X - face.Rectangle.Min.X,
+			Height: face.Rectangle.Max.Y - face.Rectangle.Min.Y,
+		})
+	}
+	return faceBounds, nil
 }
