@@ -2,46 +2,53 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"time"
+
+	pigo "github.com/esimov/pigo/core"
 )
 
-// Структура запроса API Gateway v1
-type APIGatewayRequest struct {
-	OperationID string `json:"operationId"`
-	Resource    string `json:"resource"`
-
-	HTTPMethod string `json:"httpMethod"`
-
-	Path           string            `json:"path"`
-	PathParameters map[string]string `json:"pathParameters"`
-
-	Headers           map[string]string   `json:"headers"`
-	MultiValueHeaders map[string][]string `json:"multiValueHeaders"`
-
-	QueryStringParameters           map[string]string   `json:"queryStringParameters"`
-	MultiValueQueryStringParameters map[string][]string `json:"multiValueQueryStringParameters"`
-
-	Parameters           map[string]string   `json:"parameters"`
-	MultiValueParameters map[string][]string `json:"multiValueParameters"`
-
-	Body            string `json:"body"`
-	IsBase64Encoded bool   `json:"isBase64Encoded,omitempty"`
-
-	RequestContext interface{} `json:"requestContext"`
+type Messages struct {
+	Messages []struct {
+		EventMetadata struct {
+			EventId        string    `json:"event_id"`
+			EventType      string    `json:"event_type"`
+			CreatedAt      time.Time `json:"created_at"`
+			TracingContext struct {
+				TraceId      string `json:"trace_id"`
+				SpanId       string `json:"span_id"`
+				ParentSpanId string `json:"parent_span_id"`
+			} `json:"tracing_context"`
+			CloudId  string `json:"cloud_id"`
+			FolderId string `json:"folder_id"`
+		} `json:"event_metadata"`
+		Details struct {
+			BucketId string `json:"bucket_id"`
+			ObjectId string `json:"object_id"`
+		} `json:"details"`
+	} `json:"messages"`
 }
 
-// Структура ответа API Gateway v1
-type APIGatewayResponse struct {
-	StatusCode        int                 `json:"statusCode"`
-	Headers           map[string]string   `json:"headers"`
-	MultiValueHeaders map[string][]string `json:"multiValueHeaders"`
-	Body              string              `json:"body"`
-	IsBase64Encoded   bool                `json:"isBase64Encoded,omitempty"`
+type Response struct {
+	StatusCode int         `json:"statusCode"`
+	Body       interface{} `json:"body"`
 }
 
-func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse, error) {
-	log.Printf("%v", event)
-	return &APIGatewayResponse{
+func Handler(ctx context.Context, request []byte) (*Response, error) {
+	_ = pigo.NewPigo()
+
+	messages := &Messages{}
+
+	if err := json.Unmarshal(request, messages); err != nil {
+		return nil, err
+	}
+
+	log.Println(messages)
+
+	return &Response{
 		StatusCode: 200,
+		Body:       fmt.Sprintf("Hello, %s", "rew"),
 	}, nil
 }
