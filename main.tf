@@ -59,7 +59,7 @@ resource "yandex_storage_object" "model_setup1" {
   source = "./model/dlib_face_recognition_resnet_model_v1.dat"
 }
 
-resource "yandex_storage_object" "model_setup1" {
+resource "yandex_storage_object" "model_setup2" {
   bucket = yandex_storage_bucket.input-bucket.id
   key    = "model/shape_predictor_5_face_landmarks.dat"
   source = "./model/shape_predictor_5_face_landmarks.dat"
