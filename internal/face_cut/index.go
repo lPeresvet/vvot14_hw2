@@ -72,7 +72,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 			bounds.X+bounds.Width,
 			bounds.Y+bounds.Height))
 
-		if err := imaging.Save(rectcropimg, path.Join(inputDir, uuid.New().String())); err != nil {
+		if err := imaging.Save(rectcropimg, path.Join(inputDir, uuid.New().String()+".jpg")); err != nil {
 			return nil, fmt.Errorf("failed to save img: %v", err)
 		}
 	}
