@@ -34,6 +34,11 @@ resource "yandex_iam_service_account" "func-bot-account" {
   folder_id   = var.folder_id
 }
 
+resource "yandex_iam_service_account_static_access_key" "queue-static-key" {
+  service_account_id = yandex_iam_service_account.func-bot-account.id
+  description        = "Ключ для очереди"
+}
+
 resource "yandex_resourcemanager_folder_iam_binding" "mount-iam" {
   folder_id = var.folder_id
   role               = "editor"
@@ -102,4 +107,6 @@ resource "yandex_message_queue" "task_queue" {
   visibility_timeout_seconds  = 600
   receive_wait_time_seconds   = 20
   message_retention_seconds   = 1209600
+  access_key = yandex_iam_service_account_static_access_key.queue-static-key.access_key
+  secret_key = yandex_iam_service_account_static_access_key.queue-static-key.secret_key
 }
