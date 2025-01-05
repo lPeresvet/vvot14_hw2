@@ -37,7 +37,7 @@ type FaceBounds struct {
 	Height int `json:"height"`
 }
 
-const inputDir = "images"
+const inputDir = "/function/storage/images"
 
 func Handler(ctx context.Context, request []byte) (*Response, error) {
 	messages := &Messages{}
