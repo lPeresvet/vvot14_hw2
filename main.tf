@@ -170,3 +170,32 @@ resource "yandex_function_trigger" "ymq_trigger" {
     service_account_id = yandex_iam_service_account.func-bot-account.id
   }
 }
+
+resource "yandex_api_gateway" "test-api-gateway" {
+  name        = "vvot14-apigw"
+  description = "API - шлюз для доступа к бакету faces"
+  labels      = {
+    label       = "label"
+    empty-label = ""
+  }
+  spec = <<-EOT
+    openapi: "3.0.0"
+    info:
+      version: 1.0.0
+      title: Face API
+    paths:
+      /:
+        get:
+          summary: Serve static file from Yandex Cloud Object Storage
+          parameters:
+            - name: file
+              in: query
+              required: true
+              schema:
+                type: string
+          x-yc-apigateway-integration:
+            type: object_storage
+            bucket: vvot14-faces
+            object: '{file}'
+  EOT
+}
