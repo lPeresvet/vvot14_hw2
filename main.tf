@@ -188,14 +188,15 @@ resource "yandex_api_gateway" "test-api-gateway" {
         get:
           summary: Serve static file from Yandex Cloud Object Storage
           parameters:
-            - name: file
+            - name: face
               in: query
               required: true
               schema:
                 type: string
           x-yc-apigateway-integration:
             type: object_storage
-            bucket: vvot14-faces
-            object: '{file}'
+            bucket: ${yandex_storage_bucket.faces-bucket.id}
+            object: '{face}'
+            service_account_id: ${yandex_iam_service_account.func-bot-account.id}
   EOT
 }
