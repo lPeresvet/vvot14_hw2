@@ -53,18 +53,6 @@ resource "yandex_storage_bucket" "input-bucket" {
   folder_id = var.folder_id
 }
 
-resource "yandex_storage_object" "model_setup1" {
-  bucket = yandex_storage_bucket.input-bucket.id
-  key    = "models/dlib_face_recognition_resnet_model_v1.dat"
-  source = "./models/dlib_face_recognition_resnet_model_v1.dat"
-}
-
-resource "yandex_storage_object" "model_setup2" {
-  bucket = yandex_storage_bucket.input-bucket.id
-  key    = "models/shape_predictor_5_face_landmarks.dat"
-  source = "./models/shape_predictor_5_face_landmarks.dat"
-}
-
 resource "yandex_function" "face-detect" {
   name        = "vvot14-face-detection"
   user_hash   = archive_file.zip.output_sha256
