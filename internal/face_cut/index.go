@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/disintegration/imaging"
 	"github.com/google/uuid"
 	"image"
@@ -61,7 +62,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 		img, err := imaging.Open(path.Join(inputDir, task.ObjectID))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to open input img: %s", err)
 		}
 
 		bounds := task.Bounds
@@ -72,7 +73,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 			bounds.Y+bounds.Height))
 
 		if err := imaging.Save(rectcropimg, path.Join(inputDir, uuid.New().String())); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to save img: %v", err)
 		}
 	}
 
