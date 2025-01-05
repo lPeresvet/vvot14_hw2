@@ -67,7 +67,7 @@ resource "yandex_function" "face-detect" {
   memory      = 128
   execution_timeout  = 10
   environment = {
-    "QUEUE_NAME" = local.queue_name,
+    "QUEUE_URL" = yandex_message_queue.task_queue.id,
     "AWS_ACCESS_KEY_ID"=yandex_iam_service_account_static_access_key.queue-static-key.access_key
     "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key
   }

@@ -68,21 +68,12 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 	client := sqs.NewFromConfig(cfg)
 
-	queueName := os.Getenv("QUEUE_NAME")
-
-	queue, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{
-		QueueName: &queueName,
-	})
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	fmt.Println("Queue created, URL: " + *queue.QueueUrl)
+	queueURL := os.Getenv("QUEUE_URL")
 
 	msg := "test message"
 
 	send, err := client.SendMessage(ctx, &sqs.SendMessageInput{
-		QueueUrl:    queue.QueueUrl,
+		QueueUrl:    &queueURL,
 		MessageBody: &msg,
 	})
 	if err != nil {
