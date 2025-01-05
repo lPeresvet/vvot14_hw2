@@ -38,7 +38,10 @@ type FaceBounds struct {
 	Height int `json:"height"`
 }
 
-const inputDir = "/function/storage/images"
+const (
+	inputDir  = "/function/storage/images"
+	outputDir = "/function/storage/faces"
+)
 
 func Handler(ctx context.Context, request []byte) (*Response, error) {
 	messages := &Messages{}
@@ -72,7 +75,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 			bounds.X+bounds.Width,
 			bounds.Y+bounds.Height))
 
-		if err := imaging.Save(rectcropimg, path.Join(inputDir, uuid.New().String()+".jpg")); err != nil {
+		if err := imaging.Save(rectcropimg, path.Join(outputDir, uuid.New().String()+".jpg")); err != nil {
 			return nil, fmt.Errorf("failed to save img: %v", err)
 		}
 	}
