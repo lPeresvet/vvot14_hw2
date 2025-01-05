@@ -9,6 +9,7 @@ terraform {
 
 locals {
   home = "/home/www"
+  queue_name = "vvot14-task"
 }
 
 variable "cloud_id" {
@@ -60,6 +61,9 @@ resource "yandex_function" "face-detect" {
   entrypoint  = "index.Handler"
   memory      = 128
   execution_timeout  = 10
+  environment = {
+    "QUEUE_NAME" = local.queue_name,
+  }
 
   service_account_id = yandex_iam_service_account.func-bot-account.id
 
@@ -91,4 +95,11 @@ resource "yandex_function_trigger" "input_trigger" {
     delete       = false
     batch_cutoff = 2
   }
+}
+
+resource "yandex_message_queue" "task_queue" {
+  name                        = local.queue_name
+  visibility_timeout_seconds  = 600
+  receive_wait_time_seconds   = 20
+  message_retention_seconds   = 1209600
 }
