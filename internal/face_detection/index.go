@@ -41,6 +41,18 @@ type Response struct {
 	Body       interface{} `json:"body"`
 }
 
+type CutterTask struct {
+	Bounds   FaceBounds `json:"bounds"`
+	ObjectID string     `json:"objectID"`
+}
+
+type FaceBounds struct {
+	X      int `json:"x"`
+	Y      int `json:"y"`
+	Width  int `json:"width"`
+	Height int `json:"height"`
+}
+
 func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 	messages := &Messages{}
@@ -70,7 +82,22 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 	queueURL := os.Getenv("QUEUE_URL")
 
-	msg := "test message"
+	task := CutterTask{
+		Bounds: FaceBounds{
+			X:      20,
+			Y:      20,
+			Width:  200,
+			Height: 200,
+		},
+		ObjectID: messages.Messages[0].Details.ObjectId,
+	}
+
+	msgBytes, err := json.Marshal(task)
+	if err != nil {
+		return nil, err
+	}
+
+	msg := string(msgBytes)
 
 	send, err := client.SendMessage(ctx, &sqs.SendMessageInput{
 		QueueUrl:    &queueURL,
@@ -80,17 +107,9 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 		log.Fatalln(err)
 	}
 
-	fmt.Println("Message sent, ID: " + *send.MessageId)
+	fmt.Printf("Message %s sent, ID: %v", msg, *send.MessageId)
 
 	return &Response{
 		StatusCode: 200,
-		Body:       fmt.Sprintf("Hello, %s", "rew"),
 	}, nil
-}
-
-type FaceBounds struct {
-	X      int
-	Y      int
-	Width  int
-	Height int
 }
