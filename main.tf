@@ -160,7 +160,7 @@ resource "yandex_function_trigger" "ymq_trigger" {
   name        = "vvot14-task"
 
   message_queue {
-    queue_id = yandex_message_queue.task_queue.id
+    queue_id = yandex_message_queue.task_queue.arn
     batch_cutoff = "5"
     batch_size = "5"
     service_account_id = yandex_iam_service_account.func-bot-account.id
