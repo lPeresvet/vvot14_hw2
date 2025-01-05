@@ -68,6 +68,8 @@ resource "yandex_function" "face-detect" {
   execution_timeout  = 10
   environment = {
     "QUEUE_NAME" = local.queue_name,
+    "AWS_ACCESS_KEY_ID"=yandex_iam_service_account_static_access_key.queue-static-key.access_key
+    "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key
   }
 
   service_account_id = yandex_iam_service_account.func-bot-account.id
