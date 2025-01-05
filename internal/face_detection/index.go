@@ -54,7 +54,6 @@ type FaceBounds struct {
 }
 
 func Handler(ctx context.Context, request []byte) (*Response, error) {
-
 	messages := &Messages{}
 
 	if err := json.Unmarshal(request, messages); err != nil {

@@ -112,3 +112,61 @@ resource "yandex_message_queue" "task_queue" {
   access_key = yandex_iam_service_account_static_access_key.queue-static-key.access_key
   secret_key = yandex_iam_service_account_static_access_key.queue-static-key.secret_key
 }
+
+resource "yandex_storage_bucket" "faces-bucket" {
+  bucket = "vvot14-faces"
+  folder_id = var.folder_id
+}
+
+resource "archive_file" "faces-src" {
+  type = "zip"
+  output_path = "faces-src.zip"
+  source_dir = "internal/face_cut"
+}
+
+resource "yandex_function" "face-cut" {
+  name        = "vvot14-face-cut"
+  user_hash   = archive_file.zip.output_sha256
+  runtime     = "golang121"
+  entrypoint  = "index.Handler"
+  memory      = 128
+  execution_timeout  = 10
+  environment = {
+    "QUEUE_URL" = yandex_message_queue.task_queue.id,
+    "AWS_ACCESS_KEY_ID"=yandex_iam_service_account_static_access_key.queue-static-key.access_key
+    "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key
+  }
+
+  service_account_id = yandex_iam_service_account.func-bot-account.id
+
+  storage_mounts {
+    mount_point_name = "images"
+    bucket = yandex_storage_bucket.input-bucket.bucket
+    prefix           = ""
+  }
+
+  storage_mounts {
+    mount_point_name = "faces"
+    bucket = yandex_storage_bucket.faces-bucket.bucket
+    prefix           = ""
+  }
+
+  content {
+    zip_filename = archive_file.faces-src.output_path
+  }
+}
+
+resource "yandex_function_trigger" "ymq_trigger" {
+  name        = "vvot14-task"
+
+  message_queue {
+    queue_id = yandex_message_queue.task_queue.id
+    batch_cutoff = "5"
+    batch_size = "5"
+    service_account_id = yandex_iam_service_account.func-bot-account.id
+  }
+  function {
+    id = yandex_function.face-cut.id
+    service_account_id = yandex_iam_service_account.func-bot-account.id
+  }
+}
