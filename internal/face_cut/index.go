@@ -15,7 +15,7 @@ type Messages struct {
 	Messages []struct {
 		Details struct {
 			Message struct {
-				Body string `json:"body"`
+				Body CutterTask `json:"body"`
 			} `json:"message"`
 		} `json:"details"`
 	} `json:"messages"`
