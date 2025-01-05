@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -67,7 +68,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 
 	client := sqs.NewFromConfig(cfg)
 
-	queueName := "mq_example_golang_sdk"
+	queueName := os.Getenv("QUEUE_NAME")
 
 	queue, err := client.CreateQueue(ctx, &sqs.CreateQueueInput{
 		QueueName: &queueName,
