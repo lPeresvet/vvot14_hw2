@@ -64,6 +64,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 	}()
 
 	tablePath := "relations"
+	tablePath = path.Join(db.Name(), tablePath)
 
 	messages := &Messages{}
 
