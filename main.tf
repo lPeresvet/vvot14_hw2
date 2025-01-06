@@ -203,7 +203,7 @@ resource "yandex_api_gateway" "test-api-gateway" {
 
 resource "yandex_ydb_database_serverless" "face-img-db" {
   name                = "face-img-db-serverless"
-  deletion_protection = true
+  deletion_protection = false
 
   serverless_database {
     enable_throttling_rcu_limit = false
