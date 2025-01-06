@@ -212,3 +212,22 @@ resource "yandex_ydb_database_serverless" "face-img-db" {
     throttling_rcu_limit        = 0
   }
 }
+
+resource "yandex_ydb_table" "test_table" {
+  path = "relations"
+  connection_string = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint
+
+  column {
+    name = "ImageID"
+    type = "String"
+    not_null = true
+  }
+  column {
+    name = "FaceID"
+    type = "String"
+    not_null = true
+  }
+
+  primary_key = ["ImageID","FaceID"]
+
+}

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"image"
 	"log"
 	"os"
@@ -61,6 +63,8 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 		_ = db.Close(ctx)
 	}()
 
+	tablePath := "relations"
+
 	messages := &Messages{}
 
 	if err := json.Unmarshal(request, messages); err != nil {
@@ -95,6 +99,19 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 		faceName := uuid.New().String() + ".jpg"
 		if err := imaging.Save(rectcropimg, path.Join(outputDir, faceName)); err != nil {
 			return nil, fmt.Errorf("failed to save img: %v", err)
+		}
+
+		err = db.Table().BulkUpsert(ctx,
+			tablePath,
+			table.BulkUpsertDataRows(
+				types.ListValue(
+					types.StructValue(
+						types.StructFieldValue("ImageID", types.StringValueFromString(task.ObjectID)),
+						types.StructFieldValue("FaceID", types.StringValueFromString(faceName)),
+					))),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to BulkInsert: %v", err)
 		}
 	}
 
