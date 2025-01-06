@@ -4,11 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/disintegration/imaging"
-	"github.com/google/uuid"
 	"image"
 	"log"
+	"os"
 	"path"
+
+	"github.com/disintegration/imaging"
+	"github.com/google/uuid"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 )
 
 type Response struct {
@@ -44,6 +48,19 @@ const (
 )
 
 func Handler(ctx context.Context, request []byte) (*Response, error) {
+	ydbURL := os.Getenv("YDB_URL")
+	db, err := ydb.Open(ctx,
+		ydbURL,
+		yc.WithInternalCA(),
+		yc.WithCredentials(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to init db connection: %v", err)
+	}
+	defer func() {
+		_ = db.Close(ctx)
+	}()
+
 	messages := &Messages{}
 
 	if err := json.Unmarshal(request, messages); err != nil {
@@ -75,7 +92,8 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 			bounds.X+bounds.Width,
 			bounds.Y+bounds.Height))
 
-		if err := imaging.Save(rectcropimg, path.Join(outputDir, uuid.New().String()+".jpg")); err != nil {
+		faceName := uuid.New().String() + ".jpg"
+		if err := imaging.Save(rectcropimg, path.Join(outputDir, faceName)); err != nil {
 			return nil, fmt.Errorf("failed to save img: %v", err)
 		}
 	}

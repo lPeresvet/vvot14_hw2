@@ -132,7 +132,7 @@ resource "yandex_function" "face-cut" {
   memory      = 128
   execution_timeout  = 10
   environment = {
-    "QUEUE_URL" = yandex_message_queue.task_queue.id,
+    "YDB_URL" = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint,
     "AWS_ACCESS_KEY_ID"=yandex_iam_service_account_static_access_key.queue-static-key.access_key
     "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key
   }
@@ -201,7 +201,7 @@ resource "yandex_api_gateway" "test-api-gateway" {
   EOT
 }
 
-resource "yandex_ydb_database_serverless" "database1" {
+resource "yandex_ydb_database_serverless" "face-img-db" {
   name                = "face-img-db-serverless"
   deletion_protection = true
 
