@@ -22,6 +22,11 @@ variable "folder_id" {
   description = "Идентификатор каталога"
 }
 
+variable "TG_API_KEY" {
+  type = string
+  description = "Ключ телеграмм бота"
+}
+
 provider "yandex" {
   cloud_id = var.cloud_id
   folder_id = var.folder_id
@@ -202,7 +207,7 @@ resource "yandex_api_gateway" "test-api-gateway" {
 }
 
 resource "yandex_ydb_database_serverless" "face-img-db" {
-  name                = "face-img-db-serverless"
+  name                = "vvot14-db-photo-face"
   deletion_protection = false
 
   serverless_database {
@@ -213,7 +218,7 @@ resource "yandex_ydb_database_serverless" "face-img-db" {
   }
 }
 
-resource "yandex_ydb_table" "test_table" {
+resource "yandex_ydb_table" "relations_table" {
   path = "relations"
   connection_string = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint
 
@@ -228,6 +233,68 @@ resource "yandex_ydb_table" "test_table" {
     not_null = true
   }
 
-  primary_key = ["ImageID","FaceID"]
+  primary_key = ["FaceID"]
+}
 
+resource "yandex_ydb_table" "names_table" {
+  path = "names"
+  connection_string = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint
+
+  column {
+    name = "FaceName"
+    type = "String"
+    not_null = false
+  }
+  column {
+    name = "FaceID"
+    type = "String"
+    not_null = true
+  }
+
+  primary_key = ["FaceID"]
+}
+
+resource "archive_file" "bot" {
+  type = "zip"
+  output_path = "bot_src.zip"
+  source_dir = "internal/tg_bot"
+}
+
+resource "yandex_function_iam_binding" "function-iam" {
+  function_id = yandex_function.bot.id
+  role        = "serverless.functions.invoker"
+
+  members = [
+    "system:allUsers",
+  ]
+}
+
+resource "yandex_function" "bot" {
+  name        = "vvot14-boot"
+  user_hash   = archive_file.zip.output_sha256
+  runtime     = "golang121"
+  entrypoint  = "index.Handler"
+  memory      = 128
+  execution_timeout  = 10
+  environment = {
+    "TG_API_KEY" = var.TG_API_KEY,
+    "YDB_URL" = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint,
+  }
+  service_account_id = yandex_iam_service_account.func-bot-account.id
+
+  storage_mounts {
+    mount_point_name = "faces"
+    bucket = yandex_storage_bucket.faces-bucket
+    prefix           = ""
+  }
+
+  storage_mounts {
+    mount_point_name = "images"
+    bucket = yandex_storage_bucket.input-bucket
+    prefix           = ""
+  }
+
+  content {
+    zip_filename = archive_file.bot.output_path
+  }
 }

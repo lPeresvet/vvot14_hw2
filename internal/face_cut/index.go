@@ -63,8 +63,11 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 		_ = db.Close(ctx)
 	}()
 
-	tablePath := "relations"
-	tablePath = path.Join(db.Name(), tablePath)
+	relationsPath := "relations"
+	relationsPath = path.Join(db.Name(), relationsPath)
+
+	namesPath := "names"
+	namesPath = path.Join(db.Name(), namesPath)
 
 	messages := &Messages{}
 
@@ -103,7 +106,19 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 		}
 
 		err = db.Table().BulkUpsert(ctx,
-			tablePath,
+			namesPath,
+			table.BulkUpsertDataRows(
+				types.ListValue(
+					types.StructValue(
+						types.StructFieldValue("FaceID", types.StringValueFromString(faceName)),
+					))),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to BulkInsert to relations: %v", err)
+		}
+
+		err = db.Table().BulkUpsert(ctx,
+			relationsPath,
 			table.BulkUpsertDataRows(
 				types.ListValue(
 					types.StructValue(
@@ -112,7 +127,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 					))),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to BulkInsert: %v", err)
+			return nil, fmt.Errorf("failed to BulkInsert to names: %v", err)
 		}
 	}
 
