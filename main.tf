@@ -200,3 +200,15 @@ resource "yandex_api_gateway" "test-api-gateway" {
             service_account_id: ${yandex_iam_service_account.func-bot-account.id}
   EOT
 }
+
+resource "yandex_ydb_database_serverless" "database1" {
+  name                = "face-img-db-serverless"
+  deletion_protection = true
+
+  serverless_database {
+    enable_throttling_rcu_limit = false
+    provisioned_rcu_limit       = 10
+    storage_size_limit          = 50
+    throttling_rcu_limit        = 0
+  }
+}
