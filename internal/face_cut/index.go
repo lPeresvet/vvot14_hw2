@@ -114,7 +114,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 					))),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to BulkInsert to relations: %v", err)
+			return nil, fmt.Errorf("failed to BulkInsert to names: %v", err)
 		}
 
 		err = db.Table().BulkUpsert(ctx,
@@ -127,7 +127,7 @@ func Handler(ctx context.Context, request []byte) (*Response, error) {
 					))),
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to BulkInsert to names: %v", err)
+			return nil, fmt.Errorf("failed to BulkInsert to relations: %v", err)
 		}
 	}
 
