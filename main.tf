@@ -8,7 +8,7 @@ terraform {
 }
 
 locals {
-  home = "/home/www"
+  home = "/Users/kirill"
   queue_name = "vvot14-task"
 }
 
@@ -176,7 +176,7 @@ resource "yandex_function_trigger" "ymq_trigger" {
   }
 }
 
-resource "yandex_api_gateway" "test-api-gateway" {
+resource "yandex_api_gateway" "api-gateway" {
   name        = "vvot14-apigw"
   description = "API - шлюз для доступа к бакету faces"
   labels      = {
@@ -279,22 +279,38 @@ resource "yandex_function" "bot" {
   environment = {
     "TG_API_KEY" = var.TG_API_KEY,
     "YDB_URL" = yandex_ydb_database_serverless.face-img-db.ydb_full_endpoint,
+    "API_GW_URL" = yandex_api_gateway.api-gateway.domain
   }
   service_account_id = yandex_iam_service_account.func-bot-account.id
 
   storage_mounts {
     mount_point_name = "faces"
-    bucket = yandex_storage_bucket.faces-bucket
+    bucket = yandex_storage_bucket.faces-bucket.bucket
     prefix           = ""
   }
 
   storage_mounts {
     mount_point_name = "images"
-    bucket = yandex_storage_bucket.input-bucket
+    bucket = yandex_storage_bucket.input-bucket.bucket
     prefix           = ""
   }
 
   content {
     zip_filename = archive_file.bot.output_path
+  }
+}
+
+resource "null_resource" "curl" {
+  provisioner "local-exec" {
+    command = "curl --insecure -X POST https://api.telegram.org/bot${var.TG_API_KEY}/setWebhook?url=https://functions.yandexcloud.net/${yandex_function.bot.id}"
+  }
+
+  triggers = {
+    on_version_change = var.TG_API_KEY
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = "curl --insecure -X POST https://api.telegram.org/bot${self.triggers.on_version_change}/deleteWebhook"
   }
 }

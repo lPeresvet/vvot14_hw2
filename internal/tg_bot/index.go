@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"io"
 	"log"
@@ -68,27 +69,6 @@ type Request struct {
 	} `json:"message"`
 }
 
-type GetFilePathResp struct {
-	Result struct {
-		FilePath string `json:"file_path"`
-	} `json:"result"`
-}
-
-type OCRRequest struct {
-	MimeType      string   `json:"mimeType"`
-	LanguageCodes []string `json:"languageCodes"`
-	Model         string   `json:"model"`
-	Content       string   `json:"content"`
-}
-
-type OCRResp struct {
-	Result struct {
-		TextAnnotation struct {
-			FullText string `json:"fullText"`
-		} `json:"textAnnotation"`
-	} `json:"result"`
-}
-
 type SendMsgReq struct {
 	ChatId           int64  `json:"chat_id"`
 	Text             string `json:"text"`
@@ -96,56 +76,22 @@ type SendMsgReq struct {
 	ParseMode        string `json:"parse_mode,omitempty"`
 }
 
-type YaGPTRequest struct {
-	ModelUri          string                 `json:"modelUri"`
-	CompletionOptions YaGPTRequestOptions    `json:"completionOptions"`
-	Messages          []YaGPTRequestMessages `json:"messages"`
-}
-
-type YaGPTRequestOptions struct {
-	Stream      bool    `json:"stream"`
-	Temperature float64 `json:"temperature"`
-	MaxTokens   string  `json:"maxTokens"`
-}
-
-type YaGPTRequestMessages struct {
-	Role string `json:"role"`
-	Text string `json:"text"`
-}
-
-type YaGPTResponse struct {
-	Result struct {
-		Alternatives []struct {
-			Message struct {
-				Role string `json:"role"`
-				Text string `json:"text"`
-			} `json:"message"`
-			Status string `json:"status"`
-		} `json:"alternatives"`
-		Usage struct {
-			InputTextTokens  string `json:"inputTextTokens"`
-			CompletionTokens string `json:"completionTokens"`
-			TotalTokens      string `json:"totalTokens"`
-		} `json:"usage"`
-		ModelVersion string `json:"modelVersion"`
-	} `json:"result"`
-}
-
-type TokenResponse struct {
-	AccessToken string `json:"access_token"`
-	ExpiresIn   int    `json:"expires_in"`
-	TokenType   string `json:"token_type"`
+type SendPhotoReq struct {
+	ChatId int64  `json:"chat_id"`
+	Photo  string `json:"photo"`
 }
 
 const (
 	getFilePathURLPattern  = "https://api.telegram.org/bot%s/getFile?file_id=%s"
 	sendMsgURLPattern      = "https://api.telegram.org/bot%s/sendMessage"
+	sendPhotoURLPattern    = "https://api.telegram.org/bot%s/sendPhoto"
 	downloadFileURLPattern = "https://api.telegram.org/file/bot%s"
 	localPath              = "/function/storage/images"
 	ocrURL                 = "https://ocr.api.cloud.yandex.net/ocr/v1/recognizeText"
 	catalog                = "b1g163vdicpkeevao9ga"
 	yaGPTURL               = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 	maxMessageLen          = 4096
+	gwPattern              = "https://%s/?face=%s"
 )
 
 func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse, error) {
@@ -186,7 +132,7 @@ func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse
 
 	switch cmds[0] {
 	case "/getface":
-		if err := handleGetFace(ctx, db); err != nil {
+		if err := handleGetFace(ctx, db, req.Message.Chat.ID); err != nil {
 			return nil, fmt.Errorf("failed to handle /getface: %v", err)
 		}
 	case "/find":
@@ -251,10 +197,92 @@ func sendReply(chatID int64, text string, replyToMsgID int64) error {
 	return nil
 }
 
-func handleGetFace(ctx context.Context, db *ydb.Driver) error {
-	return nil
+func handleGetFace(ctx context.Context, db *ydb.Driver, chatID int64) error {
+	return read(ctx, db.Query(), chatID)
+}
+
+func read(ctx context.Context, c query.Client, chatID int64) error {
+	return c.Do(ctx,
+		func(ctx context.Context, s query.Session) (err error) {
+			result, err := s.Query(ctx, `
+					SELECT FaceID
+					FROM names
+					WHERE FaceName is NULL
+					LIMIT 1
+				`,
+				query.WithTxControl(query.TxControl(query.BeginTx(query.WithSnapshotReadOnly()))),
+			)
+			if err != nil {
+				return err
+			}
+
+			defer func() {
+				_ = result.Close(ctx)
+			}()
+
+			for {
+				set, err := result.NextResultSet(ctx)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					return err
+				}
+
+				row, err := set.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+
+				faceID := ""
+
+				if err := row.Scan(&faceID); err != nil {
+					return err
+				}
+
+				domain := os.Getenv("API_GW_URL")
+				url := fmt.Sprintf(gwPattern, domain, faceID)
+				log.Printf("++++ %v", url)
+				if err := sendPhoto(chatID, url); err != nil {
+					return fmt.Errorf("failed to send photo: %v", err)
+				}
+			}
+
+			return nil
+		},
+	)
 }
 
 func handleFindName(ctx context.Context, db *ydb.Driver, name string) error {
+	return nil
+}
+
+func sendPhoto(chatID int64, photoURL string) error {
+	token := os.Getenv("TG_API_KEY")
+
+	sendPhotoBody := &SendPhotoReq{
+		ChatId: chatID,
+		Photo:  photoURL,
+	}
+
+	sendPhotoBodyBytes, err := json.Marshal(sendPhotoBody)
+	if err != nil {
+		return err
+	}
+
+	resp, err := http.Post(
+		fmt.Sprintf(sendPhotoURLPattern, token),
+		"application/json",
+		bytes.NewReader(sendPhotoBodyBytes))
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return errors.New("failed to send photo: " + resp.Status + " " + string(body))
+	}
+
 	return nil
 }
