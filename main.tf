@@ -198,10 +198,19 @@ resource "yandex_api_gateway" "api-gateway" {
               required: true
               schema:
                 type: string
+          responses:
+            "200":
+              description: File
+              content:
+                image/jpeg:
+                  schema:
+                    type: string
+                    format: binary
           x-yc-apigateway-integration:
-            type: object_storage
-            bucket: ${yandex_storage_bucket.faces-bucket.id}
-            object: '{face}'
+            type: cloud_functions
+            payload_format_version: '0.1'
+            function_id: ${yandex_function.api-gw.id}
+            tag: $latest
             service_account_id: ${yandex_iam_service_account.func-bot-account.id}
   EOT
 }
@@ -298,6 +307,38 @@ resource "yandex_function" "bot" {
   content {
     zip_filename = archive_file.bot.output_path
   }
+}
+
+resource "yandex_function" "api-gw" {
+  name        = "vvot14-api-gw"
+  user_hash   = archive_file.zip.output_sha256
+  runtime     = "golang121"
+  entrypoint  = "index.Handler"
+  memory      = 128
+  execution_timeout  = 10
+  service_account_id = yandex_iam_service_account.func-bot-account.id
+
+  storage_mounts {
+    mount_point_name = "faces"
+    bucket = yandex_storage_bucket.faces-bucket.bucket
+    prefix           = ""
+  }
+
+  storage_mounts {
+    mount_point_name = "images"
+    bucket = yandex_storage_bucket.input-bucket.bucket
+    prefix           = ""
+  }
+
+  content {
+    zip_filename = archive_file.gw.output_path
+  }
+}
+
+resource "archive_file" "gw" {
+  type = "zip"
+  output_path = "gw_src.zip"
+  source_dir = "internal/api_gw"
 }
 
 resource "null_resource" "curl" {
