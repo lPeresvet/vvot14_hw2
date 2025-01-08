@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	yc "github.com/ydb-platform/ydb-go-yc-metadata"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -58,15 +61,18 @@ type Photo struct {
 }
 
 type Request struct {
-	UpdateID int64 `json:"update_id"`
-	Message  struct {
-		ID   int64 `json:"message_id"`
-		Chat struct {
-			ID int64 `json:"id"`
-		} `json:"chat"`
-		Text  string  `json:"text"`
-		Photo []Photo `json:"photo,omitempty"`
-	} `json:"message"`
+	UpdateID int64   `json:"update_id"`
+	Message  Message `json:"message"`
+}
+
+type Message struct {
+	ID   int64 `json:"message_id"`
+	Chat struct {
+		ID int64 `json:"id"`
+	} `json:"chat"`
+	Text    string   `json:"text"`
+	Photo   []Photo  `json:"photo,omitempty"`
+	ReplyTo *Message `json:"reply_to_message,omitempty"`
 }
 
 type SendMsgReq struct {
@@ -117,6 +123,38 @@ func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse
 	}
 
 	//log.Println(event)
+	if req.Message.ReplyTo != nil {
+		faceID, err := read(ctx, db.Query())
+		if err != nil {
+			return nil, fmt.Errorf("failed to read face id: %v", err)
+		}
+
+		namesPath := "names"
+		namesPath = path.Join(db.Name(), namesPath)
+
+		err = db.Table().BulkUpsert(ctx,
+			namesPath,
+			table.BulkUpsertDataRows(
+				types.ListValue(
+					types.StructValue(
+						types.StructFieldValue("FaceID", types.StringValueFromString(faceID)),
+						types.StructFieldValue("FaceName", types.StringValueFromString(req.Message.Text)),
+					))),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to BulkInsert to names: %v", err)
+		}
+
+		answer := fmt.Sprintf("Лицу с ID: `%s` присвоено имя `%s`", faceID, req.Message.Text)
+
+		if err := sendReply(req.Message.Chat.ID, answer, req.Message.ID); err != nil {
+			return nil, fmt.Errorf("failed to send reply: %w", err)
+		}
+
+		return &APIGatewayResponse{
+			StatusCode: 200,
+		}, nil
+	}
 
 	if req.Message.Text == "" {
 		if err := sendReply(req.Message.Chat.ID, "Ошибка", req.Message.ID); err != nil {
@@ -198,11 +236,24 @@ func sendReply(chatID int64, text string, replyToMsgID int64) error {
 }
 
 func handleGetFace(ctx context.Context, db *ydb.Driver, chatID int64) error {
-	return read(ctx, db.Query(), chatID)
+	faceID, err := read(ctx, db.Query())
+	if err != nil {
+		return fmt.Errorf("failed to sread face id: %v", err)
+	}
+
+	domain := os.Getenv("API_GW_URL")
+	url := fmt.Sprintf(gwPattern, domain, faceID)
+	if err := sendPhoto(chatID, url); err != nil {
+		return fmt.Errorf("failed to send photo: %v", err)
+	}
+
+	return nil
 }
 
-func read(ctx context.Context, c query.Client, chatID int64) error {
-	return c.Do(ctx,
+func read(ctx context.Context, c query.Client) (string, error) {
+	faceID := ""
+
+	err := c.Do(ctx,
 		func(ctx context.Context, s query.Session) (err error) {
 			result, err := s.Query(ctx, `
 					SELECT FaceID
@@ -235,23 +286,16 @@ func read(ctx context.Context, c query.Client, chatID int64) error {
 					return err
 				}
 
-				faceID := ""
-
 				if err := row.Scan(&faceID); err != nil {
 					return err
-				}
-
-				domain := os.Getenv("API_GW_URL")
-				url := fmt.Sprintf(gwPattern, domain, faceID)
-				log.Printf("++++ %v", url)
-				if err := sendPhoto(chatID, url); err != nil {
-					return fmt.Errorf("failed to send photo: %v", err)
 				}
 			}
 
 			return nil
 		},
 	)
+
+	return faceID, err
 }
 
 func handleFindName(ctx context.Context, db *ydb.Driver, name string) error {
