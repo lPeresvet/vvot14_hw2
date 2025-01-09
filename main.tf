@@ -195,7 +195,12 @@ resource "yandex_api_gateway" "api-gateway" {
           parameters:
             - name: face
               in: query
-              required: true
+              required: false
+              schema:
+                type: string
+            - name: image
+              in: query
+              required: false
               schema:
                 type: string
           responses:

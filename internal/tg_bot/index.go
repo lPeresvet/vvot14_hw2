@@ -98,6 +98,7 @@ const (
 	yaGPTURL               = "https://llm.api.cloud.yandex.net/foundationModels/v1/completion"
 	maxMessageLen          = 4096
 	gwPattern              = "https://%s/?face=%s"
+	gwImagePattern         = "https://%s/?image=%s"
 )
 
 func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse, error) {
@@ -171,15 +172,21 @@ func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse
 	switch cmds[0] {
 	case "/getface":
 		if err := handleGetFace(ctx, db, req.Message.Chat.ID); err != nil {
-			return nil, fmt.Errorf("failed to handle /getface: %v", err)
-		}
-	case "/find":
-		if len(cmds) < 2 {
-			if err := sendReply(req.Message.Chat.ID, "Incorrect command", req.Message.ID); err != nil {
+			if err := sendReply(req.Message.Chat.ID, "Не удалось найти фото без имени", req.Message.ID); err != nil {
 				return nil, fmt.Errorf("failed to send reply: %w", err)
 			}
 		}
-		if err := handleFindName(ctx, db, cmds[1]); err != nil {
+	case "/find":
+		if len(cmds) < 2 {
+			if err := sendReply(req.Message.Chat.ID, "Ошибка", req.Message.ID); err != nil {
+				return nil, fmt.Errorf("failed to send reply: %w", err)
+			}
+
+			return &APIGatewayResponse{
+				StatusCode: 200,
+			}, nil
+		}
+		if err := handleFindName(ctx, db, cmds[1], req.Message.Chat.ID, req.Message.ID); err != nil {
 			return nil, fmt.Errorf("failed to handle /findname: %v", err)
 		}
 	default:
@@ -229,7 +236,6 @@ func sendReply(chatID int64, text string, replyToMsgID int64) error {
 			body, _ := io.ReadAll(resp.Body)
 			return errors.New("failed to send reply tg message: " + resp.Status + " " + string(body))
 		}
-
 	}
 
 	return nil
@@ -298,8 +304,82 @@ func read(ctx context.Context, c query.Client) (string, error) {
 	return faceID, err
 }
 
-func handleFindName(ctx context.Context, db *ydb.Driver, name string) error {
+func handleFindName(ctx context.Context, db *ydb.Driver, name string, chatID int64, replyTo int64) error {
+	images, err := findByName(ctx, db.Query(), name)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve images %v", err)
+	}
+
+	if len(images) == 0 {
+		return sendReply(chatID, fmt.Sprintf("Фотографии с %s не найдены", name), replyTo)
+	}
+
+	domain := os.Getenv("API_GW_URL")
+	for _, imageName := range images {
+		if err := sendPhoto(chatID, fmt.Sprintf(gwImagePattern, domain, imageName)); err != nil {
+			return fmt.Errorf("failed to send photo: %v", err)
+		}
+	}
+
 	return nil
+}
+
+var (
+	selectByName = `SELECT    r.ImageID as image
+				 FROM      (SELECT FaceID FROM names WHERE FaceName = '%s') AS n
+				 INNER  JOIN relations AS r ON n.FaceID = r.FaceID;`
+)
+
+func findByName(ctx context.Context, c query.Client, name string) ([]string, error) {
+	var images []string
+
+	err := c.Do(ctx,
+		func(ctx context.Context, s query.Session) (err error) {
+			result, err := s.Query(ctx, fmt.Sprintf(selectByName, name),
+				query.WithTxControl(query.TxControl(query.BeginTx(query.WithSnapshotReadOnly()))),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to exec query %v", err)
+			}
+
+			defer func() {
+				_ = result.Close(ctx)
+			}()
+
+			img := ""
+			for {
+				set, err := result.NextResultSet(ctx)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					return err
+				}
+
+				for {
+					row, err := set.NextRow(ctx)
+					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
+						return fmt.Errorf("read rows error: %v", err)
+					}
+
+					if err := row.Scan(&img); err != nil {
+						return err
+					}
+
+					images = append(images, img)
+				}
+			}
+
+			return nil
+		},
+	)
+
+	return images, err
 }
 
 func sendPhoto(chatID int64, photoURL string) error {

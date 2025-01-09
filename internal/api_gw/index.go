@@ -42,15 +42,30 @@ type APIGatewayResponse struct {
 	IsBase64Encoded   bool                `json:"isBase64Encoded,omitempty"`
 }
 
-const facesDir = "/function/storage/faces"
+const (
+	facesDir  = "/function/storage/faces"
+	imagesDir = "/function/storage/images"
+)
 
 func Handler(ctx context.Context, event *APIGatewayRequest) (*APIGatewayResponse, error) {
 	name := event.QueryStringParameters["face"]
+	dir := facesDir
+
+	if name == "" {
+		name = event.QueryStringParameters["image"]
+		dir = imagesDir
+	}
+
+	if name == "" {
+		return &APIGatewayResponse{
+			StatusCode: http.StatusNotFound,
+		}, nil
+	}
 
 	// В журнале будет напечатано название HTTP-метода, с помощью которого осуществлен запрос, а также путь
 	fmt.Println(event.HTTPMethod, name)
 
-	fileBytes, err := ioutil.ReadFile(path.Join(facesDir, name))
+	fileBytes, err := ioutil.ReadFile(path.Join(dir, name))
 	if err != nil {
 		return &APIGatewayResponse{
 			StatusCode: http.StatusNotFound,
