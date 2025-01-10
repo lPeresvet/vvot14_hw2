@@ -70,11 +70,12 @@ resource "yandex_function" "face-detect" {
   runtime     = "golang121"
   entrypoint  = "index.Handler"
   memory      = 128
-  execution_timeout  = 10
+  execution_timeout  = 15
   environment = {
     "QUEUE_URL" = yandex_message_queue.task_queue.id,
     "AWS_ACCESS_KEY_ID"=yandex_iam_service_account_static_access_key.queue-static-key.access_key
-    "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key
+    "AWS_SECRET_ACCESS_KEY"=yandex_iam_service_account_static_access_key.queue-static-key.secret_key,
+    "API_GW_URL" = yandex_api_gateway.api-gateway.domain
   }
 
   service_account_id = yandex_iam_service_account.func-bot-account.id
